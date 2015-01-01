@@ -60,5 +60,6 @@ public class MerkleTree {
 			hash[i]=h1[i];
 		for (int i = 0; i <h2.length ; i++)
 			hash[h1.length+i]=h2[i];
+		return hash;
 	}
 }
