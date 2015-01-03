@@ -62,4 +62,19 @@ public class MerkleTree {
 			hash[h1.length+i]=h2[i];
 		return hash;
 	}
+	
+	public static ArrayList<Byte[]> genPath(MerkleTree root, int event){
+		ArrayList<Byte[]> verPath = new ArrayList<Byte[]>(root.endingIndex);
+		MerkleTree node = root;
+		while(node.beginningIndex!=node.endingIndex){
+			if(node.left.endingIndex<=event){
+				verPath.add(node.right.getHash());
+				node = root.right;
+			}else{
+				verPath.add(node.left.getHash());
+				node = root.left;
+			}
+		}
+		return verPath;
+	}
 }
