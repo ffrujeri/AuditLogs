@@ -1,10 +1,11 @@
+
+package audit_logs;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -23,11 +24,29 @@ public class MerkleTree {
 	public MerkleTree(MerkleTree left, MerkleTree right){
 		this.left = left;
 		this.right = right;
-		hash = Hash.concatenateAndHash(left.getHash(), right.getHash());
-		beginIndex = left.getBeginIndex();
-		endIndex = right.getEndIndex();
+		hash = Hash.concatenateAndHash(left.hash, right.hash);
+		beginIndex = left.beginIndex;
+		endIndex = right.endIndex;
 	}
 
+	public int getBeginIndex(){
+		return beginIndex;
+	}
+
+	public int getEndIndex(){
+		return endIndex;
+	}
+
+	public Hash getHash(){
+		return hash;
+	}
+
+
+
+	//-----------------------------//-----------------------------//
+	// Compute merkle tree from txt
+	//-----------------------------//-----------------------------//
+	
 	/* Takes an input text file and computes its Merkle tree (treating each line 
 	 * as a new event). Works with large (>1GB) text files.
 	 */
@@ -56,12 +75,50 @@ public class MerkleTree {
 		
 		return currentLevel.poll();
 	}
-		
+
+
+
+	//-----------------------------//-----------------------------//
+	// Verify membership
+	//-----------------------------//-----------------------------//
 	
+	public static ArrayList<Hash> genPath(MerkleTree root, int i){
+		ArrayList<Hash> verificationPath = new ArrayList<Hash>();
+		MerkleTree node = root;
+		while(node.beginIndex != node.endIndex){
+			if(node.left.endIndex >= i){
+				verificationPath.add(node.right.getHash());
+				node = node.left;
+			}else{
+				verificationPath.add(node.left.getHash());
+				node = node.right;
+			}
+		
+		Collections.reverse(verificationPath);
+		}
+		
+		return verificationPath;
+	}
+
+	public static boolean verifyPath(Hash rootHash, String s, int i, Hash[] verificationPath){
+		Hash current = Hash.getHash(s);
+		for (int j = 0; j < verificationPath.length; j++) {
+			// TODO decide if concatenate from left or right? Use i!
+			current = Hash.concatenateAndHash(current, verificationPath[j]);
+		}
+		
+		return current.equals(rootHash);
+	}
+
+
+
+	//-----------------------------//-----------------------------//
+	// Appending events
+	//-----------------------------//-----------------------------//
+
 	/*  Method that takes a Merkle tree of size n and adds a string s
 	 *  to it as record e(n+1).
 	 */
-	// TODO: test!
 	public static MerkleTree addEvent(MerkleTree root, int n, String s) {
 		if (n == 0)
 			return new MerkleTree(s, 1, 1);
@@ -88,74 +145,28 @@ public class MerkleTree {
 		return root;
 	}
 
-	public static ArrayList<Hash> genPath(MerkleTree root, int i){
-		ArrayList<Hash> verificationPath = new ArrayList<Hash>();
-		MerkleTree node = root;
-		while(node.beginIndex != node.endIndex){
-			if(node.left.endIndex <= i){
-				verificationPath.add(node.right.getHash());
-				node = root.left;
-			}else{
-				verificationPath.add(node.left.getHash());
-				node = root.right;
-			}
-		}
-		
-		Collections.reverse(verificationPath);
-		return verificationPath;
+	public static MerkleTree addMultipleEvents(MerkleTree root, int n, String[] events){
+		return null;
 	}
 
-	private static int getTreeHeight(int n){
-		return (int) Math.ceil(Math.log(n)/Math.log(2.));
+	private Hash[] genUpdate(){
+		return null;
 	}
 	
-	private static int getTreeHeight(long n){
-		return (int) Math.ceil(Math.log(n)/Math.log(2.));
+	private boolean verifyUpdate(){
+		return false;
 	}
 	
-	public static boolean verifyPath(Hash rootHash, String s, int i, Hash[] verificationPath){
-		Hash current = Hash.getHash(s);
-		for (int j = 0; j < verificationPath.length; j++) {
-			// TODO decide if concatenate from left or right? Use i!
-			current = Hash.concatenateAndHash(current, verificationPath[j]);
-		}
-		
-		return current.equals(rootHash);
-	}
-	
-	public int getBeginIndex(){
-		return beginIndex;
+	private MerkleTree applyUpdate(MerkleTree root, Hash[] updates){
+		return null;
 	}
 
-	public int getEndIndex(){
-		return endIndex;
-	}
 
-	public Hash getHash(){
-		return hash;
-	}
 
-	
 	//-----------------------------//-----------------------------//
+	// Useful methods to test
 	//-----------------------------//-----------------------------//
 
-	// TODO: erase
-	public static void BFSprint(MerkleTree root){
-		System.out.println("BFS print");
-		Queue<MerkleTree> q = new LinkedList<MerkleTree>();
-		q.add(root);
-		while(!q.isEmpty()){
-			MerkleTree n = (MerkleTree) q.poll();
-			System.out.println(n.beginIndex + " * " + n.endIndex);
-			if (n.left != null)
-				q.add(n.left);
-			if (n.right != null)
-				q.add(n.right);
-		}
-		System.out.println("BFS end of print");
-	}
-
-	// TODO: erase
 	public static void DFSprint(MerkleTree n, String spaces){
 		if (n != null){
 			System.out.println(spaces + n.beginIndex + " * " + n.endIndex);
@@ -163,4 +174,13 @@ public class MerkleTree {
 			DFSprint(n.right, spaces + "   ");
 		}
 	}
+	
+	public static void pathPrint(ArrayList<Hash> a){
+		System.out.print("[");
+		for (Hash hash : a) {
+			System.out.print(" " + hash + ", ");
+		}
+		System.out.println("]");
+	}
+	
 }
