@@ -65,4 +65,10 @@ public class Hash {
 		
 		return true;
 	}
+	
+	@Override
+	public String toString(){
+		return ""+value;
+	}
+	
 }
