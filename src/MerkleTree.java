@@ -100,13 +100,17 @@ public class MerkleTree {
 		return verificationPath;
 	}
 
-	public static boolean verifyPath(Hash rootHash, String s, int i, Hash[] verificationPath){
+	public static boolean verifyPath(Hash rootHash, String s, int i, ArrayList<Hash> verificationPath){
 		Hash current = Hash.getHash(s);
-		for (int j = 0; j < verificationPath.length; j++) {
-			// TODO decide if concatenate from left or right? Use i!
-			current = Hash.concatenateAndHash(current, verificationPath[j]);
+		int order = i-1;
+		for (Hash hash : verificationPath) {
+			if((order & 1) == 0){
+				current = Hash.concatenateAndHash(current, hash);
+			}else{
+				current = Hash.concatenateAndHash(hash, current);
+			}
+			order = order >> 1;
 		}
-		
 		return current.equals(rootHash);
 	}
 
