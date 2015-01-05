@@ -116,53 +116,152 @@ public class MerkleTree {
 
 
 
-	//-----------------------------//-----------------------------//
+//-----------------------------//-----------------------------//
 	// Appending events
 	//-----------------------------//-----------------------------//
 
 	/*  Method that takes a Merkle tree of size n and adds a string s
 	 *  to it as record e(n+1).
 	 */
-	public static MerkleTree addEvent(MerkleTree root, int n, String s) {
-		if (n == 0)
-			return new MerkleTree(s, 1, 1);
+	public static MerkleTree addEvent(MerkleTree root, String s) {		
+		return addEvent(root, Hash.getHash(s));
+	}
+	
+	private static MerkleTree addEvent(MerkleTree root, Hash h) {
+		if (root == null)
+			return new MerkleTree(h, 1, 1);
+		int n = root.endIndex;
 		if (n == 1)
-			return new MerkleTree(root, new MerkleTree(s, 2, 2));
+			return new MerkleTree(root, new MerkleTree(h, 2, 2));
 		if ((n & (n - 1)) == 0) // if tree is full, create new right branch from root
-			return new MerkleTree(root, new MerkleTree(s, n + 1, n + 1));
+			return new MerkleTree(root, new MerkleTree(h, n + 1, n + 1));
 		
-		MerkleTree newNode = new MerkleTree(s, n + 1, n + 1), node = root, parent = null;
+		MerkleTree newNode = new MerkleTree(h, n + 1, n + 1), node = root, parent = null;
+		Stack<MerkleTree> traverseNodes = new Stack<MerkleTree>();
 		int q = n;
 		while ((q & (q - 1)) != 0) {
-			node.endIndex = n + 1;
+			traverseNodes.push(node);
 			parent = node;
 			node = node.right;
 			q = node.endIndex - node.beginIndex + 1;
 		}
 
 		if (node.left != null && node.right == null) { // add as right node
-			node.endIndex = n + 1;
 			node.right = newNode;
 		} else { // create new branch
 			parent.right = new MerkleTree(node, newNode);
 		}
+		
+		while(!traverseNodes.empty()){
+			node = traverseNodes.pop();
+			node.endIndex = node.right.endIndex;
+			node.hash = Hash.concatenateAndHash(node.left.hash, node.right.hash);
+		}
+		
 		return root;
 	}
 
-	public static MerkleTree addMultipleEvents(MerkleTree root, int n, String[] events){
-		return null;
+	private MerkleTree(Hash hash, int beginIndex, int endIndex){
+		this.hash = hash;
+		this.beginIndex = beginIndex;
+		this.endIndex = endIndex;
 	}
 
-	private Hash[] genUpdate(){
-		return null;
+	public static Hash[] genUpdate(MerkleTree oldTree, MerkleTree newTree){
+		int n = oldTree.endIndex, m = newTree.endIndex;
+		Hash[] hashes = new Hash[m-n+1];
+		hashes[0] = newTree.hash;
+
+		Stack<MerkleTree> s = new Stack<>();
+		s.add(newTree);
+		for(int i = 1; !s.isEmpty(); ){
+			MerkleTree node = s.pop();
+			if (node.beginIndex == node.endIndex){
+				if(node.beginIndex > n){
+					hashes[i] = node.hash;
+					i++;
+				}
+			}else{
+				if (node.left.endIndex > n){
+					s.push(node.right);
+					s.push(node.left);
+				}else if (node.right.endIndex > n)
+					s.push(node.right);
+			}
+		}
+		
+		return hashes;
 	}
 	
-	private boolean verifyUpdate(){
-		return false;
+	public static boolean verifyUpdate(MerkleTree oldTree, Hash[] updates){
+		int n = oldTree.endIndex,
+			n2 = (int) Math.pow(2., Math.floor(Math.log(n)/Math.log(2))); // biggest power of 2 <= n
+		
+		// get pertinent leaves hashes from oldTree and update vector
+		Hash completeSubtreeHash = null;
+		Queue<Hash> currentLevel = new LinkedList<>();
+		Queue<MerkleTree> q = new LinkedList<>();
+		q.add(oldTree);
+		while(!q.isEmpty()){
+			MerkleTree node = q.poll();
+			if (node != null && node.beginIndex == 1 && node.endIndex == n2){
+				completeSubtreeHash = node.hash;
+			}if (node.beginIndex == node.endIndex){
+				if(node.beginIndex > n2){
+					currentLevel.add(node.hash);
+				}
+			}else{
+				if (node.left.endIndex >= n2){
+					q.add(node.left);
+					q.add(node.right);
+				}else if (node.right.endIndex >= n2){
+					q.add(node.right);
+				}
+			}
+		}
+		
+		for (int i = 1; i < updates.length; i++)
+			currentLevel.add(updates[i]);
+
+		// compute hashes by level
+		int counter = 1;
+		for(Queue<Hash> levelUp = new LinkedList<>(); currentLevel.size() != 1; currentLevel = levelUp){
+			levelUp = new LinkedList<>();
+			while(currentLevel.size() > 0){
+				Hash h1, h2;
+				if (counter == n2){
+					h1 = completeSubtreeHash;
+					h2 = currentLevel.poll();
+					counter += 1;
+				}else{
+					h1 = currentLevel.poll();
+					h2 = currentLevel.poll();
+				}
+
+				if (h2 != null)
+					levelUp.add(Hash.concatenateAndHash(h1, h2));
+				else levelUp.add(h1);
+			}
+			
+			counter = counter << 1;
+		}
+		
+		if (counter == n2){
+			Hash h1 = completeSubtreeHash,
+				 h2 = currentLevel.poll();
+			currentLevel.add(Hash.concatenateAndHash(h1, h2));
+		}
+		
+		// verify root hash of new tree equals obtained result
+		return updates[0].equals(currentLevel.poll());
 	}
 	
-	private MerkleTree applyUpdate(MerkleTree root, Hash[] updates){
-		return null;
+	public static MerkleTree applyUpdate(MerkleTree oldTree, Hash[] updates){
+		for (int i = 1; i < updates.length; i++) {
+			oldTree = addEvent(oldTree, updates[i]);
+		}
+		
+		return oldTree;
 	}
 
 
