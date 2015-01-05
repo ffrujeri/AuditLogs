@@ -68,7 +68,11 @@ public class Hash {
 	
 	@Override
 	public String toString(){
-		return ""+value;
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < value.length; i++) {
+			sb.append(value[i]);
+		}
+		return sb.toString();
 	}
 	
 }
