@@ -7,28 +7,44 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 public class Tests {
-	/* Deprecated: Test of tree height */
-	public static int getTreeHeight(int n){
-		return (int) Math.ceil(Math.log(n)/Math.log(2.));
-	}
+	private static long time;
 
-	/* Test of addEvent to append events with txt files */
-	public static MerkleTree computeMerkleTree(File file){
+	public static void ping(){
+		time = System.currentTimeMillis();
+	}
+	
+	public static long pong(){
+		return System.currentTimeMillis() - time;
+	}
+	
+	public static void testComputeTree(String filePath){
+		System.out.println("\n\n----------------- testing computeTree(File f) -----------------");
+		System.out.println("computing tree from file " + filePath + "...");
+		File f = new File(filePath);
+		MerkleTree root = MerkleTree.computeMerkleTree(f);
+		MerkleTree.printDFS(root);
+	}
+	
+	public static void testComputeTree2(String filePath){ // no print
+	Tests.ping();
+		System.out.println("\n\n----------------- testing computeTree(File f) -----------------");
+		System.out.println("computing tree from file " + filePath + "...");
+		File f = new File(filePath);
+		MerkleTree root = MerkleTree.computeMerkleTree(f);
+		System.out.println("Merkle tree with " + (root.getEndIndex() - root.getBeginIndex() + 1) + " nodes computed succesfully in " +Tests.pong() + " ms");
+	}
+	
+	public static void testAddEvent(String filePath){
+		System.out.println("\n\n----------------- testing addEvent(MerkleTree root, String s) -----------------");
+		System.out.println("adding events tree from file " + filePath + "...");
+		File file = new File(filePath);
+
 		MerkleTree root = null;
 		try{
 			BufferedReader br = new BufferedReader(new FileReader(file));
 			String line = null;
-			line = br.readLine();
-			
-			if (line == null){
-				br.close();
-				return null;
-			}
-			
-			int n = 0;
 			while ((line = br.readLine()) != null) {
-				root = MerkleTree.addEvent(root, n, line);
-				n++;
+				root = MerkleTree.addEvent(root, line);
 			}
 			
 			br.close();
@@ -36,43 +52,61 @@ public class Tests {
 			e.printStackTrace();
 		}
 
-		return root;
+		MerkleTree.printDFS(root);
+	}
+	
+	public static void testVerifyPath(String filePath, String s, int i, boolean expectedResult){
+		System.out.println("\n\n----------------- testing verifyPath() -----------------");
+		System.out.println("computing tree from file " + filePath + "...");
+		File f = new File(filePath);
+		
+		MerkleTree root = MerkleTree.computeMerkleTree(f);
+		
+		ArrayList<Hash> verificationPath = MerkleTree.genPath(root, i);
+		boolean result = MerkleTree.verifyPath(root.getHash(), s, i, verificationPath);
+		System.out.println(" ---> Expected result = " + expectedResult + "\n" +
+						   " ---> Obtained result = " + result);
+	}
+	
+	public static void testUpdate(String filePath1, String filePath2){
+		System.out.println("\n\n----------------- testing update -----------------");
+		System.out.println("using files " + filePath1 + " and " + filePath2);
+		File f = new File(filePath1);
+		MerkleTree n1 = MerkleTree.computeMerkleTree(f);
+		f = new File(filePath2);
+		MerkleTree n2 = MerkleTree.computeMerkleTree(f);
+
+		System.out.println("---> testing genUpdate(...):");
+		Hash[] updates = MerkleTree.genUpdate(n1, n2);
+		System.out.println("\t#updates = " + (updates.length-1) + "\n");
+		
+		System.out.println("---> testing verifyUpdate(...):");
+		System.out.println("\tresult = " + MerkleTree.verifyUpdate(n1, updates) + "\n");
+
+		System.out.println("---> testing applyUpdate(...):");
+		n1 = MerkleTree.applyUpdate(n1, updates);
+		System.out.println("\tchecking if roots match... " + (n1.getHash().equals(n2.getHash()) ? " ---> YES!" : " ---> NO!"));
 	}
 
 	public static void main(String[] args) {
-//		System.out.println(Math.ceil(10.01));
-//		for(int i = 1; i < 10; i++) System.out.println("i = " + i + " * h(i) = " + getTreeHeight(i));
-
-		for (int i = 2; i <= 8; i++) {
-			String fileName = "merkle" + i + ".txt";
-			System.out.println("\n\n[merkle tree " + i + "]");
-			File f = new File(fileName);
-			MerkleTree n = MerkleTree.computeMerkleTree(f);
-//			MerkleTree.DFSprint(n, "");
-			
-			n = computeMerkleTree(f);
-			MerkleTree.DFSprint(n, "");
-		}
-
-		String fileName = "merkle15.txt";
-		System.out.println("\n\n[merkle tree 15]");
-		File f = new File(fileName);
-		MerkleTree n = MerkleTree.computeMerkleTree(f);
-		MerkleTree.DFSprint(n, "");
-		n = computeMerkleTree(f);
-		MerkleTree.DFSprint(n, "");
+		String[] f = {"", "", "merkle2.txt", "merkle3.txt", "merkle4.txt", 
+							 "merkle5.txt", "merkle6.txt", "merkle7.txt", "merkle8.txt"};
+		//String f15 = "merkle15.txt", f12MB = "merkle12MB.txt";
 		
-		ArrayList<Hash> verPath = MerkleTree.genPath(n, 4);
-		MerkleTree.pathPrint(verPath);
+		testComputeTree(f[4]);
+		testComputeTree(f[7]);
+		//testComputeTree2(f12MB);
 		
-/*		fileName = "merkle12MB.txt";
-		System.out.println("\n\n[merkle tree 15]");
-		f = new File(fileName);
-		n = MerkleTree.computeMerkleTree(f);
-		MerkleTree.DFSprint(n, "");
-		n = computeMerkleTree(f);
-		MerkleTree.DFSprint(n, "");
-	*/
-	
+		testAddEvent(f[3]);
+		//testAddEvent(f15);
+		
+		testVerifyPath(f[5], "ccc", 3, true);
+		testVerifyPath(f[8], "ddd", 4, true);
+		testVerifyPath(f[5], "ccc", 4, false);
+		testVerifyPath(f[7], "ggg", 7, true);
+
+		testUpdate(f[3], f[7]);
+		//testUpdate(f[4], f15);
 	}
+
 }
