@@ -102,14 +102,20 @@ public class MerkleTree {
 
 	public static boolean verifyPath(Hash rootHash, String s, int i, ArrayList<Hash> verificationPath){
 		Hash current = Hash.getHash(s);
-		int order = i-1;
+		int concatenationOrder = i-1;
+		int depth = (int) Math.ceil(Math.log10(i)/Math.log10(2));
+		
+
+		if (verificationPath.size() < depth)
+			concatenationOrder = concatenationOrder >> (depth-verificationPath.size());
+
 		for (Hash hash : verificationPath) {
-			if((order & 1) == 0){
+			if((concatenationOrder & 1) == 0){
 				current = Hash.concatenateAndHash(current, hash);
 			}else{
 				current = Hash.concatenateAndHash(hash, current);
 			}
-			order = order >> 1;
+			concatenationOrder = concatenationOrder >> 1;
 		}
 		return current.equals(rootHash);
 	}
