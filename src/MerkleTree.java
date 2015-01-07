@@ -103,12 +103,13 @@ public class MerkleTree {
 	public static boolean verifyPath(Hash rootHash, String s, int i, ArrayList<Hash> verificationPath){
 		Hash current = Hash.getHash(s);
 		int concatenationOrder = i-1;
-		int depth = (int) Math.ceil(Math.log10(i)/Math.log10(2));
-		
+		int completeDepth = (int) Math.ceil(Math.log10(i)/Math.log10(2));
 
-		if (verificationPath.size() < depth)
-			concatenationOrder = concatenationOrder >> (depth-verificationPath.size());
-
+		if (verificationPath.size() < completeDepth){
+			int pow = 1 << (verificationPath.size()-1);
+			concatenationOrder = pow + concatenationOrder%pow;
+		}
+					
 		for (Hash hash : verificationPath) {
 			if((concatenationOrder & 1) == 0){
 				current = Hash.concatenateAndHash(current, hash);
