@@ -7,8 +7,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Currency;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Stack;
 
 public class MerkleTree {
 	private Hash hash;
@@ -51,11 +53,15 @@ public class MerkleTree {
 	 * as a new event). Works with large (>1GB) text files.
 	 */
 	public static MerkleTree computeMerkleTree(File file){
+		return computeMerkleTree(file, false);
+	}
+
+	public static MerkleTree computeMerkleTree(File file, boolean printLevels){
 		Queue<MerkleTree> currentLevel = new LinkedList<MerkleTree>();
 		try{
 			BufferedReader br = new BufferedReader(new FileReader(file));
 			String line;
-			for(long i = 1; (line = br.readLine()) != null; i++){
+			for(int i = 1; (line = br.readLine()) != null; i++){
 				currentLevel.add(new MerkleTree(line, (int) i, (int) i));
 			}
 			br.close();
@@ -63,7 +69,12 @@ public class MerkleTree {
 			e.printStackTrace();
 		}
 		
+		if (printLevels)
+			System.out.println("File read. Building tree...");
+		
 		for(Queue<MerkleTree> levelUp = new LinkedList<MerkleTree>(); levelUp.size() != 1; currentLevel = levelUp){
+			if (printLevels)
+				System.out.println("\tlevel with " + currentLevel.size() + " nodes built");
 			levelUp = new LinkedList<MerkleTree>();
 			while(currentLevel.size() > 0){
 				MerkleTree left = currentLevel.poll(), right = currentLevel.poll();
@@ -93,23 +104,32 @@ public class MerkleTree {
 				verificationPath.add(node.left.getHash());
 				node = node.right;
 			}
-		
-		Collections.reverse(verificationPath);
 		}
+
+		Collections.reverse(verificationPath);
 		
 		return verificationPath;
 	}
 
 	public static boolean verifyPath(Hash rootHash, String s, int i, ArrayList<Hash> verificationPath){
 		Hash current = Hash.getHash(s);
-		int concatenationOrder = i-1;
-		int completeDepth = (int) Math.ceil(Math.log10(i)/Math.log10(2));
-
-		if (verificationPath.size() < completeDepth){
-			int pow = 1 << (verificationPath.size()-1);
-			concatenationOrder = pow + concatenationOrder%pow;
+		int h = (int) Math.ceil(Math.log10(i)/Math.log10(2));
+		int concatenationOrder = i - 1;
+		
+		if (verificationPath.size() < h){
+			int nZerosCut = h - verificationPath.size();
+			for (int j = 0; j < nZerosCut; j++) {
+				int pointer = 1 << (h-1-j), y = pointer;
+				while((pointer & concatenationOrder) > 0){
+					pointer = pointer >> 1;
+					y += pointer;
+				}
+				
+				int x = pointer - 1;
+				concatenationOrder = (concatenationOrder & x) + ((concatenationOrder & y) >> 1);
+			}
 		}
-					
+
 		for (Hash hash : verificationPath) {
 			if((concatenationOrder & 1) == 0){
 				current = Hash.concatenateAndHash(current, hash);
@@ -121,9 +141,25 @@ public class MerkleTree {
 		return current.equals(rootHash);
 	}
 
+	public static boolean verifyPath(Hash rootHash, String s, int i, ArrayList<Hash> verificationPath, int n){
+		Hash current = Hash.getHash(s);
+		for (Hash hash : verificationPath) {
+			if (i % 2 == 0)
+				current = Hash.concatenateAndHash(hash, current);
+			else{
+				if (n > i)
+					current = Hash.concatenateAndHash(current, hash);
+				else
+					current = Hash.concatenateAndHash(hash, current);
+			}
+			i = (i+1) >> 1;
+			n = (n+1) >> 1;
+		}
+		
+		return current.equals(rootHash);
+	}
 
-
-//-----------------------------//-----------------------------//
+	//-----------------------------//-----------------------------//
 	// Appending events
 	//-----------------------------//-----------------------------//
 
@@ -176,10 +212,13 @@ public class MerkleTree {
 
 	public static Hash[] genUpdate(MerkleTree oldTree, MerkleTree newTree){
 		int n = oldTree.endIndex, m = newTree.endIndex;
+		if (m < n)
+			return null;
+		
 		Hash[] hashes = new Hash[m-n+1];
 		hashes[0] = newTree.hash;
 
-		Stack<MerkleTree> s = new Stack<>();
+		Stack<MerkleTree> s = new Stack<MerkleTree>();
 		s.add(newTree);
 		for(int i = 1; !s.isEmpty(); ){
 			MerkleTree node = s.pop();
@@ -206,8 +245,8 @@ public class MerkleTree {
 		
 		// get pertinent leaves hashes from oldTree and update vector
 		Hash completeSubtreeHash = null;
-		Queue<Hash> currentLevel = new LinkedList<>();
-		Queue<MerkleTree> q = new LinkedList<>();
+		Queue<Hash> currentLevel = new LinkedList<Hash>();
+		Queue<MerkleTree> q = new LinkedList<MerkleTree>();
 		q.add(oldTree);
 		while(!q.isEmpty()){
 			MerkleTree node = q.poll();
@@ -232,8 +271,8 @@ public class MerkleTree {
 
 		// compute hashes by level
 		int counter = 1;
-		for(Queue<Hash> levelUp = new LinkedList<>(); currentLevel.size() != 1; currentLevel = levelUp){
-			levelUp = new LinkedList<>();
+		for(Queue<Hash> levelUp = new LinkedList<Hash>(); currentLevel.size() != 1; currentLevel = levelUp){
+			levelUp = new LinkedList<Hash>();
 			while(currentLevel.size() > 0){
 				Hash h1, h2;
 				if (counter == n2){
@@ -274,23 +313,18 @@ public class MerkleTree {
 
 
 	//-----------------------------//-----------------------------//
-	// Useful methods to test
+	// Print tree indexes
 	//-----------------------------//-----------------------------//
 
-	public static void DFSprint(MerkleTree n, String spaces){
+	public static void printDFS(MerkleTree n){
+		printDFS(n, "");
+	}
+
+	private static void printDFS(MerkleTree n, String spaces){
 		if (n != null){
 			System.out.println(spaces + n.beginIndex + " * " + n.endIndex);
-			DFSprint(n.left, spaces + "   ");
-			DFSprint(n.right, spaces + "   ");
+			printDFS(n.left, spaces + "   ");
+			printDFS(n.right, spaces + "   ");
 		}
 	}
-	
-	public static void pathPrint(ArrayList<Hash> a){
-		System.out.print("[");
-		for (Hash hash : a) {
-			System.out.print(" " + hash + ", ");
-		}
-		System.out.println("]");
-	}
-	
 }
